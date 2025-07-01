@@ -176,7 +176,7 @@ def setup_google_sheets():
     except gspread.WorksheetNotFound:
         worksheets['raw_data'] = sheet.add_worksheet(title="Raw_Data", rows="1000", cols="10")
         # Add header
-        header = ['Timestamp', 'Bus_ID', 'Route', 'Direction', 'Latitude', 'Longitude', 'Trip_ID']
+        header = ['Timestamp', 'Bus_ID', 'Route', 'Direction', 'Latitude', 'Longitude', 'Trip_ID', 'Nearest_Stop', 'Distance_Metres']
         worksheets['raw_data'].append_row(header)
     
     # Route-specific tabs (will be created later when we have stop data)
@@ -385,6 +385,14 @@ def update_raw_data_sheet(worksheet, bus_data):
     
     rows_to_add = []
     for bus in bus_data:
+        # Find nearest stop and distance
+        nearest_stop, distance = find_nearest_stop(
+            bus['latitude'], 
+            bus['longitude'], 
+            bus['route'], 
+            bus['direction']
+        )
+        
         rows_to_add.append([
             timestamp,
             bus['bus_id'],
@@ -392,7 +400,9 @@ def update_raw_data_sheet(worksheet, bus_data):
             bus['direction'],
             bus['latitude'],
             bus['longitude'],
-            bus['trip_id']
+            bus['trip_id'],
+            nearest_stop,
+            round(distance) if distance != float('inf') else ''
         ])
     
     if rows_to_add:
@@ -637,9 +647,9 @@ def main():
             except Exception as e:
                 print(f"General error in poll #{poll_count}: {e}")
             
-            # Sleep for 2 minutes before next poll
+            # Sleep for 1 minute before next poll
             print("...")
-            time.sleep(120)
+            time.sleep(60)
             
     except Exception as e:
         print(f"Fatal error: {e}")
