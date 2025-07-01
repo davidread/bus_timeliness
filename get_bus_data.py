@@ -9,7 +9,7 @@ import json
 import pandas as pd
 import gspread
 from datetime import datetime, timedelta
-from config import ROUTES_TO_ANALYZE
+from config import ROUTES_TO_ANALYZE, GOOGLE_SHEET_ID
 import time
 import os
 import sys
@@ -163,14 +163,9 @@ def setup_google_sheets():
     credentials_path = os.path.expanduser('~/.gcloud/scraper-service-account-key.json')
     gc = gspread.service_account(filename=credentials_path)
     
-    # Try to open existing sheet, create if doesn't exist
-    try:
-        sheet = gc.open("Bus_Timeliness_Data")
-        print(f"Opened existing Google Sheet: https://docs.google.com/spreadsheets/d/{sheet.id}")
-    except gspread.SpreadsheetNotFound:
-        sheet = gc.create("Bus_Timeliness_Data")
-        sheet.share('', perm_type='anyone', role='reader')
-        print(f"Created new Google Sheet: https://docs.google.com/spreadsheets/d/{sheet.id}")
+    # Use sheet ID from config
+    sheet = gc.open_by_key(GOOGLE_SHEET_ID)
+    print(f"Opened configured Google Sheet: https://docs.google.com/spreadsheets/d/{sheet.id}")
     
     # Setup tabs
     worksheets = {}
