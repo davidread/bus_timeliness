@@ -1,0 +1,51 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install quality tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install ruff black isort
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+    
+    - name: Check code formatting with Black
+      run: |
+        black --check --diff .
+      continue-on-error: true
+    
+    - name: Check import sorting with isort
+      run: |
+        isort --check-only --diff .
+      continue-on-error: true
+    
+    - name: Lint with Ruff
+      run: |
+        ruff check .
+      continue-on-error: true
+    
+    - name: Check for security issues with Bandit
+      run: |
+        pip install bandit
+        bandit -r . -x tests/ || echo "Bandit checks completed"
+      continue-on-error: true
+    
+    - name: Run tests with coverage
+      run: |
+        pytest tests/ --cov=get_bus_data --cov-report=term-missing --cov-fail-under=50

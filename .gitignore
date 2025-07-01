@@ -1,0 +1,70 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment variables and secrets
+.bods_key
+.env
+.env.local
+.env.production
+
+# API responses and cached data
+api_response_*.xml
+timetable-*.xml
+dataset_*.zip
+
+# Manual test files (keep pytest tests)
+test_*.py
+!tests/
+!requirements-test.txt
+
+# Pytest
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# AI
+.claude
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+
+# Google Sheets credentials (if stored locally)
+*credentials*.json
+*service-account*.json

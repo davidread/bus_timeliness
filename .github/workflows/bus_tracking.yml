@@ -1,0 +1,56 @@
+name: Bus Tracking
+
+on:
+  schedule:
+    - cron: '45 6 * * *'   # 6:45am UTC
+    - cron: '30 15 * * *'  # 3:30pm UTC
+  workflow_dispatch:  # Allow manual runs
+
+jobs:
+  # Run tests first to ensure code quality
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+    
+    - name: Run tests
+      run: pytest tests/ -v
+  
+  # Only run tracking if tests pass
+  track-buses:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 180  # 3 hours
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Create BODS API key file
+      run: echo "${{ secrets.BODS_API_KEY }}" > .bods_key
+    
+    - name: Create Google Sheets credentials
+      run: echo '${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}' > google_sheets_credentials.json
+    
+    - name: Run bus tracking
+      run: python get_bus_data.py
