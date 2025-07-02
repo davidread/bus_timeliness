@@ -29,7 +29,6 @@ wheels/
 
 # API responses and cached data
 api_response_*.xml
-timetable-*.xml
 dataset_*.zip
 
 # Pytest
