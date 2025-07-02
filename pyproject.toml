@@ -68,6 +68,8 @@ ensure_newline_before_comments = true
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -83,5 +85,5 @@ ignore = [
     "C901",  # too complex
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501"]

@@ -4,14 +4,12 @@ Main script to collect bus location data from BODS API and track arrivals at sto
 Runs for 3 hours, polling every 2 minutes.
 """
 
-import json
 import os
 import sys
 import time
 from datetime import datetime, timedelta
 
 import gspread
-import pandas as pd
 import requests
 
 from config import GOOGLE_SHEET_ID, ROUTES_TO_ANALYZE
@@ -19,7 +17,7 @@ from config import GOOGLE_SHEET_ID, ROUTES_TO_ANALYZE
 
 def load_bods_key():
     """Load BODS API key from file."""
-    with open(".bods_key", "r") as f:
+    with open(".bods_key") as f:
         return f.read().strip()
 
 
@@ -95,9 +93,6 @@ def get_route_stops(api_key, route_name, direction):
     """Get stops for a specific route and direction from BODS API."""
     # This would need the actual BODS API endpoint for route/stop data
     # For now, return empty list - will be populated from actual API
-    stops_url = f"https://data.bus-data.dft.gov.uk/api/v1/dataset/"
-    headers = {"X-API-Key": api_key}
-
     # TODO: Implement actual API call to get stops for route/direction
     # This is a placeholder - actual implementation depends on BODS API structure
     return []
@@ -129,7 +124,7 @@ def validate_routes(api_key, target_routes):
 
         # Check if the route exists in any direction
         route_found = False
-        for available_route, available_direction in available_routes:
+        for available_route, _available_direction in available_routes:
             if available_route == route_name:
                 route_found = True
                 break
@@ -175,7 +170,6 @@ def filter_target_routes(bus_data, target_routes):
 
 def setup_google_sheets():
     """Initialize Google Sheets connection with multiple tabs."""
-    import os
 
     credentials_path = os.path.expanduser("~/.gcloud/scraper-service-account-key.json")
     gc = gspread.service_account(filename=credentials_path)
@@ -568,7 +562,7 @@ def update_route_specific_sheet(worksheet, arrivals, stops):
             bus_id = row.get("Bus_ID", "")
             if date and bus_id:
                 existing_keys.add(f"{date}_{bus_id}")
-    except:
+    except Exception:
         existing_keys = set()
 
     # Create rows for new arrivals

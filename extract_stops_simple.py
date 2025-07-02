@@ -35,7 +35,6 @@ def get_stops_from_journey_pattern_sections(xml_file):
         print(f"Processing section: {section_id}")
 
         # Get all stops in sequence from this section
-        section_stops = []
         for timing_link in jp_section.findall(".//txc:JourneyPatternTimingLink", ns):
             # Check From stop
             from_elem = timing_link.find(".//txc:From", ns)
