@@ -32,11 +32,6 @@ api_response_*.xml
 timetable-*.xml
 dataset_*.zip
 
-# Manual test files (keep pytest tests)
-test_*.py
-!tests/
-!requirements-test.txt
-
 # Pytest
 .pytest_cache/
 htmlcov/
