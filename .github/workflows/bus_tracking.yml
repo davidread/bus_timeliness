@@ -46,11 +46,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
-    - name: Create BODS API key file
-      run: echo "${{ secrets.BODS_API_KEY }}" > .bods_key
-    
-    - name: Create Google Sheets credentials
-      run: echo '${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}' > google_sheets_credentials.json
-    
     - name: Run bus tracking
       run: python get_bus_data.py
+      env:
+        BODS_KEY: ${{ secrets.BODS_KEY }}
+        GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}

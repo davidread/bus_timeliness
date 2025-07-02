@@ -16,9 +16,15 @@ from config import GOOGLE_SHEET_ID, ROUTES_TO_ANALYZE
 
 
 def load_bods_key():
-    """Load BODS API key from file."""
-    with open(".bods_key") as f:
-        return f.read().strip()
+    """Load BODS API key from file or environment variable."""
+    try:
+        with open(".bods_key") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        key = os.getenv("BODS_KEY")
+        if not key:
+            raise ValueError("BODS API key not found in .bods_key file or BODS_KEY environment variable")
+        return key
 
 
 def get_bus_positions(api_key, line_ref):
@@ -170,9 +176,21 @@ def filter_target_routes(bus_data, target_routes):
 
 def setup_google_sheets():
     """Initialize Google Sheets connection with multiple tabs."""
-
+    
     credentials_path = os.path.expanduser("~/.gcloud/scraper-service-account-key.json")
-    gc = gspread.service_account(filename=credentials_path)
+    
+    # Try file-based credentials first, then environment variable
+    if os.path.exists(credentials_path):
+        gc = gspread.service_account(filename=credentials_path)
+    else:
+        # Try environment variable
+        credentials_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_KEY")
+        if not credentials_json:
+            raise ValueError("Google service account credentials not found in file or GOOGLE_SERVICE_ACCOUNT_KEY environment variable")
+        
+        import json
+        credentials_dict = json.loads(credentials_json)
+        gc = gspread.service_account_from_dict(credentials_dict)
 
     # Use sheet ID from config
     sheet = gc.open_by_key(GOOGLE_SHEET_ID)

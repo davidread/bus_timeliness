@@ -2,7 +2,6 @@
 Test arrival detection logic and state tracking.
 """
 
-
 from get_bus_data import _bus_previous_state, detect_stop_arrivals
 
 

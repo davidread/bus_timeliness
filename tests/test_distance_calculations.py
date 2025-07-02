@@ -2,8 +2,6 @@
 Test distance calculations and coordinate handling.
 """
 
-
-
 from get_bus_data import calculate_distance, find_nearest_stop
 
 
