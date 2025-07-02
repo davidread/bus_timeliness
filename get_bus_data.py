@@ -571,49 +571,64 @@ def update_route_specific_sheet(worksheet, arrivals, stops):
         # Store the arrival time for this bus at this stop
         arrivals_by_date_bus[date][bus_id][stop_name] = time
 
-    # Get current sheet data to avoid duplicates
+    # Get current sheet data to find existing rows to update
     try:
         existing_data = worksheet.get_all_records()
-        existing_keys = set()
-        for row in existing_data:
+        existing_rows = {}  # {(date, bus_id): row_index}
+        for i, row in enumerate(existing_data):
             date = row.get("Date", "")
             bus_id = row.get("Bus_ID", "")
             if date and bus_id:
-                existing_keys.add(f"{date}_{bus_id}")
+                existing_rows[(date, bus_id)] = i + 2  # +2 because sheets are 1-indexed and have header
     except Exception:
-        existing_keys = set()
+        existing_rows = {}
 
-    # Create rows for new arrivals
     stop_names = [stop["name"] for stop in stops]
     rows_to_add = []
+    rows_to_update = []
 
     for date, buses in arrivals_by_date_bus.items():
         for bus_id, stop_arrivals in buses.items():
-            # Check if we already have data for this date/bus combination
-            key = f"{date}_{bus_id}"
-            if key in existing_keys:
-                continue
-
-            # Create row with arrival times
             # Find a trip_id from any arrival for this bus
             trip_id = ""
             for arrival in arrivals:
                 if arrival["bus_id"] == bus_id:
                     trip_id = arrival["trip_id"]
                     break
-            row = [date, bus_id, trip_id]
 
-            # Add arrival times for each stop (empty if no arrival recorded)
-            for stop_name in stop_names:
-                arrival_time = stop_arrivals.get(stop_name, "")
-                row.append(arrival_time)
-
-            rows_to_add.append(row)
+            row_key = (date, bus_id)
+            if row_key in existing_rows:
+                # Update existing row with new arrival times
+                row_index = existing_rows[row_key]
+                # Get current values and update with new arrivals
+                updates = []
+                for col_index, stop_name in enumerate(stop_names):
+                    if stop_name in stop_arrivals:
+                        # Column D is first stop (A=Date, B=Bus_ID, C=Trip_ID, D=first stop)
+                        cell_address = f"{chr(68 + col_index)}{row_index}"
+                        updates.append({"range": cell_address, "values": [[stop_arrivals[stop_name]]]})
+                
+                if updates:
+                    rows_to_update.extend(updates)
+            else:
+                # Create new row
+                row = [date, bus_id, trip_id]
+                # Add arrival times for each stop (empty if no arrival recorded)
+                for stop_name in stop_names:
+                    arrival_time = stop_arrivals.get(stop_name, "")
+                    row.append(arrival_time)
+                rows_to_add.append(row)
 
     # Add new rows to sheet
     if rows_to_add:
         worksheet.append_rows(rows_to_add)
-        print(f"Added {len(rows_to_add)} arrival records to route sheet")
+        print(f"Added {len(rows_to_add)} new bus records to route sheet")
+
+    # Update existing rows with new arrival times
+    if rows_to_update:
+        for update in rows_to_update:
+            worksheet.update(update["range"], update["values"])
+        print(f"Updated {len(rows_to_update)} stop arrivals in existing rows")
 
 
 def main():
