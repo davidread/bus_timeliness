@@ -558,9 +558,10 @@ def update_route_specific_sheet(worksheet, arrivals, stops):
     if not arrivals:
         return
 
-    # Group arrivals by date and bus
     from collections import defaultdict
+    from datetime import datetime, timedelta
 
+    # Group arrivals by date and bus, but track journey times
     arrivals_by_date_bus = defaultdict(lambda: defaultdict(dict))
 
     for arrival in arrivals:
@@ -572,17 +573,53 @@ def update_route_specific_sheet(worksheet, arrivals, stops):
         # Store the arrival time for this bus at this stop
         arrivals_by_date_bus[date][bus_id][stop_name] = time
 
-    # Get current sheet data to find existing rows to update
+    # Get current sheet data to find existing rows to update or determine journey separation
     try:
         existing_data = worksheet.get_all_records()
-        existing_rows = {}  # {(date, bus_id): row_index}
+        existing_rows = {}  # {(date, bus_id, journey_group): row_index}
+        bus_journey_times = {}  # {(date, bus_id): [list of earliest times from existing rows]}
+        
         for i, row in enumerate(existing_data):
             date = row.get("Date", "")
             bus_id = row.get("Bus_ID", "")
             if date and bus_id:
-                existing_rows[(date, bus_id)] = i + 2  # +2 because sheets are 1-indexed and have header
+                # Find the earliest time in this row (first non-empty stop time)
+                earliest_time = None
+                for stop in stops:
+                    stop_time = row.get(stop["name"], "")
+                    if stop_time:
+                        earliest_time = stop_time
+                        break
+                
+                if earliest_time:
+                    if (date, bus_id) not in bus_journey_times:
+                        bus_journey_times[(date, bus_id)] = []
+                    bus_journey_times[(date, bus_id)].append({
+                        "earliest_time": earliest_time,
+                        "row_index": i + 2  # +2 because sheets are 1-indexed and have header
+                    })
     except Exception:
         existing_rows = {}
+        bus_journey_times = {}
+
+    def is_same_journey(new_time, existing_time):
+        """Check if two times are within 3 hours (same journey)."""
+        try:
+            new_dt = datetime.strptime(new_time, "%H:%M:%S")
+            existing_dt = datetime.strptime(existing_time, "%H:%M:%S")
+            
+            # Handle day boundary crossings
+            if abs((new_dt - existing_dt).total_seconds()) > 12 * 3600:  # More than 12 hours apart
+                # One is likely from previous/next day, adjust
+                if new_dt.hour < 12 and existing_dt.hour > 12:
+                    new_dt += timedelta(days=1)
+                elif existing_dt.hour < 12 and new_dt.hour > 12:
+                    existing_dt += timedelta(days=1)
+            
+            time_diff = abs((new_dt - existing_dt).total_seconds())
+            return time_diff < 3 * 3600  # Less than 3 hours = same journey
+        except ValueError:
+            return False
 
     stop_names = [stop["name"] for stop in stops]
     rows_to_add = []
@@ -597,39 +634,56 @@ def update_route_specific_sheet(worksheet, arrivals, stops):
                     trip_id = arrival["trip_id"]
                     break
 
-            row_key = (date, bus_id)
-            if row_key in existing_rows:
+            # Find the earliest time in the new arrivals
+            new_earliest_time = None
+            for stop_name in stop_names:
+                if stop_name in stop_arrivals:
+                    new_earliest_time = stop_arrivals[stop_name]
+                    break
+
+            if not new_earliest_time:
+                continue  # No arrival times for this bus
+
+            # Check if this should update an existing row or create a new one
+            update_row_index = None
+            if (date, bus_id) in bus_journey_times:
+                for journey_info in bus_journey_times[(date, bus_id)]:
+                    if is_same_journey(new_earliest_time, journey_info["earliest_time"]):
+                        update_row_index = journey_info["row_index"]
+                        break
+
+            if update_row_index:
                 # Update existing row with new arrival times
-                row_index = existing_rows[row_key]
-                # Get current values and update with new arrivals
                 updates = []
                 for col_index, stop_name in enumerate(stop_names):
                     if stop_name in stop_arrivals:
                         # Column D is first stop (A=Date, B=Bus_ID, C=Trip_ID, D=first stop)
-                        cell_address = f"{chr(68 + col_index)}{row_index}"
+                        cell_address = f"{chr(68 + col_index)}{update_row_index}"
                         updates.append({"range": cell_address, "values": [[stop_arrivals[stop_name]]]})
 
                 if updates:
                     rows_to_update.extend(updates)
+                    print(f"Updating existing journey for bus {bus_id} (same journey as {journey_info['earliest_time']})")
             else:
-                # Create new row
+                # Create new row - this is a separate journey
                 row = [date, bus_id, trip_id]
                 # Add arrival times for each stop (empty if no arrival recorded)
                 for stop_name in stop_names:
                     arrival_time = stop_arrivals.get(stop_name, "")
                     row.append(arrival_time)
                 rows_to_add.append(row)
+                print(f"Creating new journey row for bus {bus_id} starting at {new_earliest_time}")
 
     # Add new rows to sheet
     if rows_to_add:
         worksheet.append_rows(rows_to_add)
-        print(f"Added {len(rows_to_add)} new bus records to route sheet")
+        print(f"Added {len(rows_to_add)} new bus journey records to route sheet")
 
     # Update existing rows with new arrival times
     if rows_to_update:
         for update in rows_to_update:
             worksheet.update(update["range"], update["values"])
-        print(f"Updated {len(rows_to_update)} stop arrivals in existing rows")
+        print(f"Updated {len(rows_to_update)} stop arrivals in existing journey rows")
 
 
 def main():
