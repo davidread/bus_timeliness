@@ -8,6 +8,7 @@ import os
 import sys
 import time
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import gspread
 import requests
@@ -176,9 +177,9 @@ def filter_target_routes(bus_data, target_routes):
 
 def setup_google_sheets():
     """Initialize Google Sheets connection with multiple tabs."""
-    
+
     credentials_path = os.path.expanduser("~/.gcloud/scraper-service-account-key.json")
-    
+
     # Try file-based credentials first, then environment variable
     if os.path.exists(credentials_path):
         gc = gspread.service_account(filename=credentials_path)
@@ -187,7 +188,7 @@ def setup_google_sheets():
         credentials_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_KEY")
         if not credentials_json:
             raise ValueError("Google service account credentials not found in file or GOOGLE_SERVICE_ACCOUNT_KEY environment variable")
-        
+
         import json
         credentials_dict = json.loads(credentials_json)
         gc = gspread.service_account_from_dict(credentials_dict)
@@ -439,7 +440,7 @@ def print_bus_locations(filtered_buses):
 
 def update_raw_data_sheet(worksheet, bus_data):
     """Update raw data sheet with current bus positions."""
-    timestamp = datetime.now().isoformat()
+    timestamp = datetime.now(ZoneInfo("Europe/London")).isoformat()
 
     rows_to_add = []
     for bus in bus_data:
@@ -522,7 +523,7 @@ def detect_stop_arrivals(filtered_buses, arrival_threshold_meters=100):
 
                 arrivals.append(
                     {
-                        "timestamp": datetime.now().isoformat(),
+                        "timestamp": datetime.now(ZoneInfo("Europe/London")).isoformat(),
                         "bus_id": bus_id,
                         "trip_id": trip_id,
                         "route": route,
@@ -607,7 +608,7 @@ def update_route_specific_sheet(worksheet, arrivals, stops):
                         # Column D is first stop (A=Date, B=Bus_ID, C=Trip_ID, D=first stop)
                         cell_address = f"{chr(68 + col_index)}{row_index}"
                         updates.append({"range": cell_address, "values": [[stop_arrivals[stop_name]]]})
-                
+
                 if updates:
                     rows_to_update.extend(updates)
             else:
@@ -633,7 +634,7 @@ def update_route_specific_sheet(worksheet, arrivals, stops):
 
 def main():
     """Main execution function - runs for 3 hours."""
-    start_time = datetime.now()
+    start_time = datetime.now(ZoneInfo("Europe/London"))
     end_time = start_time + timedelta(hours=3)
 
     print(f"Starting bus tracking at {start_time}")
@@ -662,9 +663,9 @@ def main():
 
         poll_count = 0
 
-        while datetime.now() < end_time:
+        while datetime.now(ZoneInfo("Europe/London")) < end_time:
             poll_count += 1
-            current_time = datetime.now()
+            current_time = datetime.now(ZoneInfo("Europe/London"))
 
             print(f"Poll #{poll_count} at {current_time}")
 
@@ -738,7 +739,7 @@ def main():
         print(f"Fatal error: {e}")
         raise
 
-    print(f"Completed {poll_count} polls. Tracking session ended at {datetime.now()}")
+    print(f"Completed {poll_count} polls. Tracking session ended at {datetime.now(ZoneInfo('Europe/London'))}")
 
 
 if __name__ == "__main__":
