@@ -112,8 +112,28 @@ Tests are organized by functionality:
 - **Arrival detection** (`test_arrival_detection.py`) - State transition logic
 - **XML parsing** (`test_xml_parsing.py`) - SIRI and TransXChange formats
 - **Data filtering** (`test_data_filtering.py`) - Route filtering logic
+- **Journey separation** (`test_journey_separation.py`) - Multi-journey handling logic
+- **Main functions** (`test_main_functions.py`) - Refactored main() components
 
 All external API calls are mocked to prevent live API usage during testing.
+
+## Refactored Architecture
+
+The main function has been split into testable components:
+
+### Core Functions (get_bus_data.py:689-840)
+- **`initialize_tracking_session()`** - API key validation and Google Sheets setup
+- **`collect_bus_data()`** - BODS API data collection with error handling
+- **`process_bus_data()`** - Bus data processing, arrival detection, and sheet updates
+- **`update_route_specific_sheets()`** - Route-specific Google Sheets updates
+- **`run_tracking_loop()`** - Main polling loop with configurable duration
+- **`main()`** - Orchestrates the entire tracking session
+
+This design enables:
+- **Unit testing** of individual components
+- **Easier debugging** of specific functionality
+- **Code reuse** for different tracking scenarios
+- **Better error isolation** and handling
 
 ## Configuration
 

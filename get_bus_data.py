@@ -686,114 +686,154 @@ def update_route_specific_sheet(worksheet, arrivals, stops):
         print(f"Updated {len(rows_to_update)} stop arrivals in existing journey rows")
 
 
+def initialize_tracking_session(target_routes):
+    """Initialize the tracking session with API validation and Google Sheets setup."""
+    # Load API key
+    api_key = load_bods_key()
+
+    # Validate configured routes exist
+    validate_routes(api_key, target_routes)
+
+    # Setup sheets
+    worksheets, sheet = setup_google_sheets()
+
+    # Get stop data for each route and create route tabs
+    for route_config in target_routes:
+        route_name = route_config["route_name"]
+        for direction in route_config["directions"]:
+            stops = extract_stops_from_xml(route_name, direction)
+            if stops:
+                # Create a modified route config for this specific direction
+                direction_config = {"route_name": route_name, "direction": direction}
+                route_tab = create_route_tab_with_stops(sheet, direction_config, stops)
+                worksheets[f"{route_name}_{direction}"] = route_tab
+
+    return api_key, worksheets
+
+
+def collect_bus_data(api_key, target_routes):
+    """Collect bus position data from BODS API for all target routes."""
+    all_buses = []
+    for route_config in target_routes:
+        route_name = route_config["route_name"]
+        try:
+            bus_data = get_bus_positions(api_key, route_name)
+            all_buses.extend(bus_data.get("entity", []))
+        except Exception as e:
+            print(f"BODS API error for route {route_name}: {e}")
+            continue
+    
+    return all_buses
+
+
+def process_bus_data(filtered_buses, worksheets):
+    """Process bus data, detect arrivals, and update Google Sheets."""
+    if not filtered_buses:
+        return []
+
+    # Print bus locations
+    print_bus_locations(filtered_buses)
+
+    # Detect stop arrivals
+    arrivals = detect_stop_arrivals(filtered_buses, arrival_threshold_meters=100)
+    if arrivals:
+        print(f"Detected {len(arrivals)} stop arrivals:")
+        for arrival in arrivals:
+            print(
+                f"  Bus {arrival['bus_id']} at {arrival['stop_name']} ({arrival['distance_meters']}m)"
+            )
+
+    # Update raw data sheet
+    try:
+        update_raw_data_sheet(worksheets["raw_data"], filtered_buses)
+        print("Updated raw data sheet")
+    except Exception as e:
+        print(f"Google Sheets error: {e}")
+
+    # Update route-specific sheets with arrivals
+    if arrivals:
+        update_route_specific_sheets(arrivals, worksheets)
+
+    return arrivals
+
+
+def update_route_specific_sheets(arrivals, worksheets):
+    """Update route-specific Google Sheets with arrival data."""
+    try:
+        # Group arrivals by route and direction
+        arrivals_by_route_direction = {}
+        for arrival in arrivals:
+            key = f"{arrival['route']}_{arrival['direction']}"
+            if key not in arrivals_by_route_direction:
+                arrivals_by_route_direction[key] = []
+            arrivals_by_route_direction[key].append(arrival)
+
+        # Update each route-specific sheet
+        for key, route_arrivals in arrivals_by_route_direction.items():
+            if key in worksheets:
+                route_name, direction = key.split("_", 1)
+                stops = extract_stops_from_xml(route_name, direction)
+                update_route_specific_sheet(
+                    worksheets[key], route_arrivals, stops
+                )
+
+    except Exception as e:
+        print(f"Route-specific sheets error: {e}")
+
+
+def run_tracking_loop(api_key, worksheets, target_routes, duration_hours=3):
+    """Run the main tracking loop for the specified duration."""
+    start_time = datetime.now(ZoneInfo("Europe/London"))
+    end_time = start_time + timedelta(hours=duration_hours)
+    poll_count = 0
+
+    print(f"Starting tracking loop until {end_time}")
+
+    while datetime.now(ZoneInfo("Europe/London")) < end_time:
+        poll_count += 1
+        current_time = datetime.now(ZoneInfo("Europe/London"))
+
+        print(f"Poll #{poll_count} at {current_time}")
+
+        try:
+            # Collect bus data from API
+            all_buses = collect_bus_data(api_key, target_routes)
+
+            # Filter for target routes
+            filtered_buses = filter_target_routes({"entity": all_buses}, target_routes)
+            print(f"Found {len(filtered_buses)} buses on target routes")
+
+            # Process the data and update sheets
+            process_bus_data(filtered_buses, worksheets)
+
+        except Exception as e:
+            print(f"General error in poll #{poll_count}: {e}")
+
+        # Sleep for 1 minute before next poll
+        print("...")
+        time.sleep(60)
+
+    return poll_count
+
+
 def main():
     """Main execution function - runs for 3 hours."""
     start_time = datetime.now(ZoneInfo("Europe/London"))
-    end_time = start_time + timedelta(hours=3)
-
+    
     print(f"Starting bus tracking at {start_time}")
-    print(f"Will run until {end_time}")
 
     try:
-        # Load API key
-        api_key = load_bods_key()
+        # Initialize the tracking session
+        api_key, worksheets = initialize_tracking_session(ROUTES_TO_ANALYZE)
 
-        # Validate configured routes exist
-        validate_routes(api_key, ROUTES_TO_ANALYZE)
+        # Run the main tracking loop
+        poll_count = run_tracking_loop(api_key, worksheets, ROUTES_TO_ANALYZE, duration_hours=3)
 
-        # Setup sheets
-        worksheets, sheet = setup_google_sheets()
-
-        # Get stop data for each route and create route tabs
-        for route_config in ROUTES_TO_ANALYZE:
-            route_name = route_config["route_name"]
-            for direction in route_config["directions"]:
-                stops = extract_stops_from_xml(route_name, direction)
-                if stops:
-                    # Create a modified route config for this specific direction
-                    direction_config = {"route_name": route_name, "direction": direction}
-                    route_tab = create_route_tab_with_stops(sheet, direction_config, stops)
-                    worksheets[f"{route_name}_{direction}"] = route_tab
-
-        poll_count = 0
-
-        while datetime.now(ZoneInfo("Europe/London")) < end_time:
-            poll_count += 1
-            current_time = datetime.now(ZoneInfo("Europe/London"))
-
-            print(f"Poll #{poll_count} at {current_time}")
-
-            try:
-                # Get bus positions for each route
-                all_buses = []
-                for route_config in ROUTES_TO_ANALYZE:
-                    route_name = route_config["route_name"]
-                    try:
-                        bus_data = get_bus_positions(api_key, route_name)
-                        all_buses.extend(bus_data.get("entity", []))
-                    except Exception as e:
-                        print(f"BODS API error for route {route_name}: {e}")
-                        continue
-
-                # Filter for target routes
-                filtered_buses = filter_target_routes({"entity": all_buses}, ROUTES_TO_ANALYZE)
-                print(f"Found {len(filtered_buses)} buses on target routes")
-
-                if filtered_buses:
-                    # Print bus locations
-                    print_bus_locations(filtered_buses)
-
-                    # Detect stop arrivals
-                    arrivals = detect_stop_arrivals(filtered_buses, arrival_threshold_meters=100)
-                    if arrivals:
-                        print(f"Detected {len(arrivals)} stop arrivals:")
-                        for arrival in arrivals:
-                            print(
-                                f"  Bus {arrival['bus_id']} at {arrival['stop_name']} ({arrival['distance_meters']}m)"
-                            )
-
-                    # Update raw data sheet
-                    try:
-                        update_raw_data_sheet(worksheets["raw_data"], filtered_buses)
-                        print("Updated raw data sheet")
-                    except Exception as e:
-                        print(f"Google Sheets error: {e}")
-
-                    # Update route-specific sheets with arrivals
-                    if arrivals:
-                        try:
-                            # Group arrivals by route and direction
-                            arrivals_by_route_direction = {}
-                            for arrival in arrivals:
-                                key = f"{arrival['route']}_{arrival['direction']}"
-                                if key not in arrivals_by_route_direction:
-                                    arrivals_by_route_direction[key] = []
-                                arrivals_by_route_direction[key].append(arrival)
-
-                            # Update each route-specific sheet
-                            for key, route_arrivals in arrivals_by_route_direction.items():
-                                if key in worksheets:
-                                    route_name, direction = key.split("_", 1)
-                                    stops = extract_stops_from_xml(route_name, direction)
-                                    update_route_specific_sheet(
-                                        worksheets[key], route_arrivals, stops
-                                    )
-
-                        except Exception as e:
-                            print(f"Route-specific sheets error: {e}")
-
-            except Exception as e:
-                print(f"General error in poll #{poll_count}: {e}")
-
-            # Sleep for 1 minute before next poll
-            print("...")
-            time.sleep(60)
+        print(f"Completed {poll_count} polls. Tracking session ended at {datetime.now(ZoneInfo('Europe/London'))}")
 
     except Exception as e:
         print(f"Fatal error: {e}")
         raise
-
-    print(f"Completed {poll_count} polls. Tracking session ended at {datetime.now(ZoneInfo('Europe/London'))}")
 
 
 if __name__ == "__main__":
