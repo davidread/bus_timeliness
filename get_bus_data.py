@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Main script to collect bus location data from BODS API and track arrivals at stops.
-Runs for 3 hours, polling every 2 minutes.
+Runs for 2 hours 59 minutes, polling every minute.
 """
 
 import os
@@ -781,7 +781,7 @@ def update_route_specific_sheets(arrivals, worksheets):
         print(f"Route-specific sheets error: {e}")
 
 
-def run_tracking_loop(api_key, worksheets, target_routes, duration_hours=3):
+def run_tracking_loop(api_key, worksheets, target_routes, duration_hours=2.98333):
     """Run the main tracking loop for the specified duration."""
     start_time = datetime.now(ZoneInfo("Europe/London"))
     end_time = start_time + timedelta(hours=duration_hours)
@@ -817,7 +817,7 @@ def run_tracking_loop(api_key, worksheets, target_routes, duration_hours=3):
 
 
 def main():
-    """Main execution function - runs for 3 hours."""
+    """Main execution function - runs for 2 hours 59 minutes."""
     start_time = datetime.now(ZoneInfo("Europe/London"))
     
     print(f"Starting bus tracking at {start_time}")
@@ -827,7 +827,7 @@ def main():
         api_key, worksheets = initialize_tracking_session(ROUTES_TO_ANALYZE)
 
         # Run the main tracking loop
-        poll_count = run_tracking_loop(api_key, worksheets, ROUTES_TO_ANALYZE, duration_hours=3)
+        poll_count = run_tracking_loop(api_key, worksheets, ROUTES_TO_ANALYZE, duration_hours=2.98333)
 
         print(f"Completed {poll_count} polls. Tracking session ended at {datetime.now(ZoneInfo('Europe/London'))}")
 
