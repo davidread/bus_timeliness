@@ -3,8 +3,9 @@ name: Bus Tracking
 on:
   schedule:
     # GitHub Actions uses UTC time. During British Summer Time (Mar-Oct):
-    - cron: '45 5 * * *'   # 5:30am UTC (6:30am in summer)
-    - cron: '00 15 * * *'  # 3:00pm UTC (4:00pm in summer)
+    # Only run Monday-Friday (1-5), skip weekends
+    - cron: '45 5 * * 1-5'   # 5:45am UTC (6:45am in summer), Mon-Fri only
+    - cron: '00 15 * * 1-5'  # 3:00pm UTC (4:00pm in summer), Mon-Fri only
   workflow_dispatch:  # Allow manual runs
 
 jobs:
